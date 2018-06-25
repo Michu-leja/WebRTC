@@ -1,10 +1,31 @@
+/*
+* Funciones para videoconferencia
+* openSocket: Abre el socket correspondiente, connectandose al servidor de señalización
+* onRemoteStream: Obtiene el video del par remoto
+* onRemoteStreamEnded: Remueve el video, si se termina la transmisión del peer remoto
+* OnRoomFound: En caso de que el par remoto encuentre un cuarto ya creado, se genera el botón Join para unirse a la videoconferencia
+    -joinRoom, es llamado para unir al peer remoto al cuarto
+    -CaptureUserMedia: obtiene el MediaStream del peer remoto.
+*Funciones para ScreenSharing
+* onScreen: Si ya existe un cuarto compartiendo pantalla, se crea un boton View para unirse a la transmisión
+* onAddStream: Obtiene el video screensharing del par remoto
+* onuserleft: Remueve el video si se termina la transmisión del par remoto
+*onRoomClosed:
+* onNumberOfParticipantsChanged: Indica el numero de participantes que ven la pantalla
+* CHAT:
+* onChannelMessage: crea los espacios para insertar el texto
+* */
+
+//Variable de configuración
 var config = {
     openSocket: function(config) {
-        var SIGNALING_SERVER = 'https:192.168.1.88:4444/';
+        var SIGNALING_SERVER = 'https://172.29.88.174:4444/';
 
         config.channel = config.channel || location.href.replace(/\/|:|#|%|\.|\[|\]/g, '');
         var sender = Math.round(Math.random() * 999999999) + 999999999;
 
+        //.connect: conectarse al servidor de señalización
+        //.emit recibe como argumentos nombredel evento: 'new-channel' y argumentos de configuracion de canal y url
         io.connect(SIGNALING_SERVER).emit('new-channel', {
             channel: config.channel,
             sender: sender
@@ -12,6 +33,7 @@ var config = {
 
         var socket = io.connect(SIGNALING_SERVER + config.channel);
         socket.channel = config.channel;
+        //evento connect
         socket.on('connect', function() {
             if (config.callback) config.callback(socket);
         });
@@ -22,7 +44,7 @@ var config = {
                 data: message
             });
         };
-
+//.on : nuevo controlador para un evento dado
         socket.on('message', config.onmessage);
     },
     onRemoteStream: function(media) {
@@ -30,7 +52,9 @@ var config = {
             width: (videosContainer.clientWidth / 2) - 50,
             buttons: ['mute-audio', 'mute-video', 'full-screen', 'volume-slider']
         });
+        //getTracks: obtiene todos los mediaStreamTrack de un objeto MediaStream
         mediaElement.id = media.stream.getTracks();
+        //añade el video (tracks a el videoContainer)
         videosContainer.appendChild(mediaElement);
 
     },
@@ -69,45 +93,44 @@ var config = {
 
 
         },
-//Onscreen para screenSharing
+
+    // /ScreenSharing
     onScreen:function(_screen) {
-
-        var alreadyExist = document.getElementById(_screen.userid);
+        var alreadyExist = document.getElementById(_screen.idBoton);
         if (alreadyExist) return;
-
         if (typeof roomListScreen === 'undefined') roomListScreen = document.body;
-
         var tr = document.createElement('tr');
 
-        tr.id = _screen.userid;
-        tr.innerHTML = '<td>' + username + ' shared his screen.</td>' +
-            '<td><button class="join">View</button></td>';
+        tr.id = _screen.idBoton;
+        tr.innerHTML = '<td>' + _screen.userName + ' shared his screen.</td>' +
+            '<td><button class="joinS">View</button></td>';
         roomListScreen.insertBefore(tr, roomListScreen.firstChild);
         share_screen.visible=false;
-        var button = tr.querySelector('.join');
-        button.setAttribute('data-userid', _screen.userid);
-        button.setAttribute('data-roomid', _screen.roomid);
+        var button = tr.querySelector('.joinS');
+        button.setAttribute('data-userid', _screen.userName);
+        button.setAttribute('data-roomid', _screen.roomName);
 
         button.onclick = function() {
             var button = this;
             button.disabled = true;
 
             var _screen = {
-                userid: button.getAttribute('data-userid'),
-                roomid: button.getAttribute('data-roomid')
+                userName: button.getAttribute('data-userid'),
+                roomName: button.getAttribute('data-roomid')
             };
-
+            /*
                 hangoutUI.join({
-                    roomToken: tr.querySelector('.join').id,
+                    roomToken: tr.querySelector('.joinS').id,
                     joinUser: tr.id,
                     userName: username
-                });
-            //aun no se sabe
+                });*/
+            //para poder visualizar la pantalla
             hangoutUI.view(_screen);
+
         };
     },
-//ONADDSTREAM
     onaddstream : function(media) {
+        console.log('on addstream screen sh');
         media.video.id = media.userid;
 
         var video = media.video;
@@ -125,17 +148,13 @@ var config = {
             });
         }
     },
-//fin de onaddstream
-//Onuserleft
     onuserleft : function(userid) {
         var video = document.getElementById(userid);
         if (video && video.parentNode) video.parentNode.removeChild(video);
 
-        // location.reload();
+        location.reload();
     },
-
-
-onRoomClosed: function(room) {
+    onRoomClosed: function(room) {
         var joinButton = document.querySelector('button[data-roomToken="' + room.roomToken + '"]');
         if (joinButton) {
             // joinButton.parentNode === <li>
@@ -146,8 +165,7 @@ onRoomClosed: function(room) {
         }
 
     },
-
-    onNumberOfParticipantsChnaged : function(numberOfParticipants) {
+    onNumberOfParticipantsChanged : function(numberOfParticipants) {
         if(!screensharing.isModerator) return;
 
         document.title = numberOfParticipants + ' users are viewing your screen!';
@@ -156,10 +174,10 @@ onRoomClosed: function(room) {
             element.innerHTML = numberOfParticipants + ' users are viewing your screen!';
         }
     },
-
     onReady: function() {
         console.log('now you can open or join rooms');
     },
+    //CHAT
     onChannelOpened: function(/* channel */) {
         hideUnnecessaryStuff();
     },
@@ -173,49 +191,17 @@ onRoomClosed: function(room) {
 
         chatOutput.insertBefore(tr, chatOutput.firstChild);
     },
-
-
-
-
 };
-document.getElementById('share-screen').onclick = function() {
 
-var username=username;
-hangoutUI.isModerator=true;
-hangoutUI.userid=username;
-hangoutUI.createRoom({
-    userName:username,
-        roomName: roomname}
-
-)
-    captureUserMediaS(function() {
-    hangoutUI.share();});
-
-};
 
 //screen sharing
 var username;
 var roomname;
-function createButtonClickHandler() {
-
-username=prompt('Enter your name', 'Anonymous');
-roomname= (document.getElementById('conference-name') || { }).value || 'Anonymous',
-    captureUserMedia(function () {
-        hangoutUI.createRoom({
-            userName:username,
-            roomName: (document.getElementById('conference-name') || { }).value || 'Anonymous',
-
-        });
-        hideUnnecessaryStuff();
 
 
-    })
-
-share_screen.disabled=false;
-}
-
+//CAPTURE USER MEDIA
+//CaptureUserMedia para compartición de pantalla
 function captureUserMediaS(callback, extensionAvailable) {
-
     getScreenId(function(error, sourceId, screen_constraints) {
         if (IsAndroidChrome) {
             screen_constraints = {
@@ -233,12 +219,13 @@ function captureUserMediaS(callback, extensionAvailable) {
         }
 
         console.log('screen_constraints', JSON.stringify(screen_constraints, null, '\t'));
+        //obtener pantalla local
         navigator.mediaDevices.getUserMedia(screen_constraints).then(function(stream) {
             addStreamStopListener(stream, function() {
                 if (self.onuserleft) self.onuserleft('self');
             });
-
             self.stream = stream;
+            //crear el elemento video para la comparticion de la pantalla
 
             var video = document.createElement('video');
             video.id = 'self';
@@ -254,9 +241,14 @@ function captureUserMediaS(callback, extensionAvailable) {
                 video.setAttribute('playsinline', true);
                 video.setAttribute('controls', true);
             }
+            var constraints = {
+                audio: false,
+                video: screen_constraints
+            };
+
 
             video.srcObject = stream;
-            console.log('en getusermediaM')
+            console.log('en getusermediaM');
             config.onaddstream({
                 video: video,
                 stream: stream,
@@ -265,7 +257,9 @@ function captureUserMediaS(callback, extensionAvailable) {
             });
 
             callback(stream);
+
         }).catch(function(error) {
+
             if (adapter.browserDetails.browser === 'chrome') {
                 alert('Screen capturing is either denied or not supported. Please install chrome extension for screen capturing or run chrome with command-line flag: --enable-usermedia-screen-capturing');
             }else if (adapter.browserDetails.browser === 'chrome' && location.protocol === 'http:') {
@@ -278,8 +272,10 @@ function captureUserMediaS(callback, extensionAvailable) {
     }, true);
 }
 
-
+//CaptureUserMedia para videoconferencia
 function captureUserMedia(callback, failure_callback) {
+    //Crear elemento video para videoconferencia
+
     var video = document.createElement('video');
     video.muted = true;
     video.volume = 0;
@@ -293,12 +289,13 @@ function captureUserMedia(callback, failure_callback) {
         video.setAttribute('playsinline', true);
         video.setAttribute('controls', true);
     }
-
+        //Para agregar el video al peer antes de transmitirlo
     getUserMedia({
         video: video,
         onsuccess: function(stream) {
             console.log('onsuccess '+stream);
-            config.attachStream = stream;
+
+            config.attachStream=stream;
 
             var mediaElement = getMediaElement(video, {
                 width: (videosContainer.clientWidth / 2) - 50,
@@ -316,19 +313,121 @@ function captureUserMedia(callback, failure_callback) {
     });
 }
 
-/* on page load: get public rooms */
+
+//Variables específicas
+//hangoutUI= multiple conexión
+//videosContainer=contenedor para videoconferencia
+//VideosContainerS= contenedor para compartición
+//roomList= para añadir botones de join
+//room-listScreen= para añadir botón view screensh
+//chatOutput= tabla para el chat
+//
 
 var hangoutUI = hangout(config);
-
-/* UI specific */
 var videosContainer = document.getElementById('videos-container') || document.body;
-var videosContainerS=document.getElementById('videos-container2')
+var videosContainerS=document.getElementById('videos-container2');
 var startConferencing = document.getElementById('start-conferencing');
-if (startConferencing) startConferencing.onclick = createButtonClickHandler;
 var roomsList = document.getElementById('rooms-list');
 var roomListScreen=document.getElementById('rooms-listScreen');
 var chatOutput = document.getElementById('chat-output');
 var share_screen=document.getElementById('share-screen');
+var chatMessage = document.getElementById('chat-message');
+
+
+//MANEJADORES DE BOTONES
+//share-screen: manejador del botón share-screen para compartición de pantalla
+//video-conferencing: Manejador del evento para crear cuarto de videoconferencia y chat
+
+$(document).ready(function () {
+    $("#share-screen").click(function () {
+
+        var username=username;
+        hangoutUI.isModerator=true;
+        /*hangoutUI.createRoom({
+        userName:username,
+            roomName: roomname}
+
+    )*/
+        captureUserMediaS(function() {
+            hangoutUI.share();});
+    });
+
+
+});
+$(document).ready(function () {
+    $("#start-conferencing").click(function () {
+        username=prompt('Enter your name', 'Anonymous');
+        roomname= (document.getElementById('conference-name') || { }).value || 'Anonymous',
+            captureUserMedia(function () {
+                hangoutUI.createRoom({
+                    userName:username,
+                    roomName: (document.getElementById('conference-name') || { }).value || 'Anonymous',
+                });
+                hideUnnecessaryStuff();
+            })
+share_screen.disabled=false;
+    });
+});
+$(document).ready(function () {
+    $("#chat-message").change(function () {
+        hangoutUI.send(this.value);
+        var tr = document.createElement('tr');
+        tr.innerHTML =
+            '<td style="width:40%;">You:</td>' +
+            '<td>' + chatMessage.value + '</td>';
+
+        chatOutput.insertBefore(tr, chatOutput.firstChild);
+        chatMessage.value = '';
+
+
+
+    })
+});
+/*
+document.getElementById('share-screen').onclick = function() {
+
+    var username=username;
+    hangoutUI.isModerator=true;
+    /*hangoutUI.createRoom({
+    userName:username,
+        roomName: roomname}
+
+)
+    captureUserMediaS(function() {
+    hangoutUI.share();});
+
+};*/
+/*function createButtonClickHandler() {
+
+username=prompt('Enter your name', 'Anonymous');
+roomname= (document.getElementById('conference-name') || { }).value || 'Anonymous',
+    captureUserMedia(function () {
+        hangoutUI.createRoom({
+            userName:username,
+            roomName: (document.getElementById('conference-name') || { }).value || 'Anonymous',
+
+        });
+        hideUnnecessaryStuff();
+
+
+    })
+
+//share_screen.disabled=false;
+}*/
+/*if (chatMessage)
+    chatMessage.onchange = function() {
+        hangoutUI.send(this.value);
+        var tr = document.createElement('tr');
+        tr.innerHTML =
+            '<td style="width:40%;">You:</td>' +
+            '<td>' + chatMessage.value + '</td>';
+
+        chatOutput.insertBefore(tr, chatOutput.firstChild);
+        chatMessage.value = '';
+    };*/
+
+
+
 
 function hideUnnecessaryStuff() {
     var visibleElements = document.getElementsByClassName('visible'),
@@ -343,27 +442,12 @@ function hideUnnecessaryStuff() {
     if (chatOutput) chatOutput.style.display = 'block';
     if (chatMessage) chatMessage.disabled = false;
 }
-
-var chatMessage = document.getElementById('chat-message');
-if (chatMessage)
-    chatMessage.onchange = function() {
-        hangoutUI.send(this.value);
-        var tr = document.createElement('tr');
-        tr.innerHTML =
-            '<td style="width:40%;">You:</td>' +
-            '<td>' + chatMessage.value + '</td>';
-
-        chatOutput.insertBefore(tr, chatOutput.firstChild);
-        chatMessage.value = '';
-    };
-
 function rotateVideo(video) {
     video.style[navigator.mozGetUserMedia ? 'transform' : '-webkit-transform'] = 'rotate(0deg)';
     setTimeout(function() {
         video.style[navigator.mozGetUserMedia ? 'transform' : '-webkit-transform'] = 'rotate(360deg)';
     }, 1000);
 }
-
 (function() {
     var uniqueToken = document.getElementById('unique-token');
     if (uniqueToken)
@@ -399,5 +483,4 @@ function scaleVideos() {
             video.width = maxVideoWidth - minus;
     }
 }
-
 window.onresize = scaleVideos;

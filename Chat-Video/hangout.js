@@ -7,7 +7,8 @@ var hangout = function(config) {
             userName: 'Anonymous'
         },
         channels = '--',
-        isbroadcaster, isbroadcasterS,
+        isbroadcaster,
+        isbroadcasterS = false,
         isGetNewRoom = true,
         sockets = [],
         defaultSocket = { }, RTCDataChannels = [];
@@ -24,13 +25,14 @@ var hangout = function(config) {
     function onDefaultSocketResponse(response) {
         if (response.userToken == self.userToken) return;
 
-        if (isGetNewRoom && response.roomToken && response.broadcaster) {config.onRoomFound(response)
+        if (isGetNewRoom && response.roomToken && response.broadcaster) {
+            config.onRoomFound(response)
 
-        if(isbroadcasterS=true){
-            config.onScreen(response)
-        }
         };
 
+        if(response.broadcasterS ){
+            config.onScreen(response)
+        }
 
         if (response.newParticipant && self.joinedARoom && self.broadcasterid == response.userToken) onNewParticipant(response.newParticipant);
 
@@ -77,6 +79,7 @@ var hangout = function(config) {
 
         var peerConfig = {
             attachStream: config.attachStream,
+            //attachStreams:config.attachStreams,
 
             onICE: function(candidate) {
                 socket.send({
@@ -117,10 +120,10 @@ var hangout = function(config) {
             },
             //screen sharing
             onscreen: function(screen) {
-                if (self.detectedRoom) return;
-                self.detectedRoom = true;
+                //if (self.detectedRoom) return;
+                //self.detectedRoom = true;
 
-                self.view(screen);
+               self.view(screen);
             },
             onuserleft: function(_userid) {
                 if (root.onuserleft) root.onuserleft(_userid);
@@ -329,7 +332,8 @@ var hangout = function(config) {
         defaultSocket && defaultSocket.send({
             roomToken: self.roomToken,
             roomName: self.roomName,
-            broadcaster: self.userToken
+            broadcaster: self.userToken,
+            userName:self.userName
         });
         setTimeout(startBroadcasting, 3000);
     }
@@ -367,7 +371,9 @@ var hangout = function(config) {
        defaultSocket && defaultSocket.send({
            roomToken: self.roomToken,
            roomName: self.roomName,
-           broadcasterS: self.userToken
+           broadcasterS: true,
+           idBoton: 'michellin',
+           userName:self.userName
        });
        setTimeout(broadcast, 3000);};
 
@@ -421,9 +427,8 @@ var hangout = function(config) {
             console.log('estoy en share');
            // self.roomid=roomid;
             isbroadcasterS=true;
-
                 //openSubSocket(channels);
-                startBroadcasting();
+                broadcast();
 
         },
         join : function(_config) {

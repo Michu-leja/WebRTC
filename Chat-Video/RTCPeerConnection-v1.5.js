@@ -80,13 +80,13 @@ function RTCPeerConnection(options) {
             options.onICE(event.candidate);
     };
 
-   // attachStream = MediaStream;
+  // attachStream = MediaStream;
     //attachStreams =[];
   if (options.attachStream) peer.addStream(options.attachStream);
 /*
-     attachStreams[0] = stream.audio;
-     attachStreams[1] = stream.video;
-     attachStreams[2] = stream.screen;*/
+    attachStreams[0] = audio-stream;
+    attachStreams[1] = video-stream;
+    attachStreams[2] = screen-capturing-stream;*/
 
     if (options.attachStreams && options.attachStream.length) {
         console.log('en attachstreams')
@@ -294,6 +294,7 @@ function getUserMedia(options) {
         if (video) {
             video[moz ? 'mozSrcObject' : 'src'] = moz ? stream : window.webkitURL.createObjectURL(stream);
             video.play();
+
         }
         options.onsuccess && options.onsuccess(stream);
         media = stream;
